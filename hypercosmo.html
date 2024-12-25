@@ -1,0 +1,281 @@
+<html><head><base href="." />
+<title>Spinning 5D Hypersphere</title>
+<style>
+  body { margin: 0; background-color: #000; overflow: hidden; }
+  canvas { display: block; }
+  #info {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: white;
+    font-family: Arial, sans-serif;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+<div id="info">5D Hypersphere Projection<br>Use controls to adjust rotation in various dimensions</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+<script>
+// Scene setup
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Controls for all possible 5D rotations
+const controls = {
+    // 4D rotations
+    rotationXY: 0.01,
+    rotationYZ: 0.01,
+    rotationXZ: 0.01,
+    rotationXW: 0.01,
+    rotationYW: 0.01,
+    rotationZW: 0.01,
+    // 5D rotations (with V being the fifth dimension)
+    rotationXV: 0.01,
+    rotationYV: 0.01,
+    rotationZV: 0.01,
+    rotationWV: 0.01,
+    distance5D: 2,
+    resolution: 12,
+    sphereRadius: 1
+};
+
+// Create GUI with more rotation controls
+const gui = new dat.GUI();
+const rotationFolder4D = gui.addFolder('4D Rotations');
+rotationFolder4D.add(controls, 'rotationXY', -0.05, 0.05).name('XY Plane');
+rotationFolder4D.add(controls, 'rotationYZ', -0.05, 0.05).name('YZ Plane');
+rotationFolder4D.add(controls, 'rotationXZ', -0.05, 0.05).name('XZ Plane');
+rotationFolder4D.add(controls, 'rotationXW', -0.05, 0.05).name('XW Plane');
+rotationFolder4D.add(controls, 'rotationYW', -0.05, 0.05).name('YW Plane');
+rotationFolder4D.add(controls, 'rotationZW', -0.05, 0.05).name('ZW Plane');
+
+const rotationFolder5D = gui.addFolder('5D Rotations');
+rotationFolder5D.add(controls, 'rotationXV', -0.05, 0.05).name('XV Plane');
+rotationFolder5D.add(controls, 'rotationYV', -0.05, 0.05).name('YV Plane');
+rotationFolder5D.add(controls, 'rotationZV', -0.05, 0.05).name('ZV Plane');
+rotationFolder5D.add(controls, 'rotationWV', -0.05, 0.05).name('WV Plane');
+
+gui.add(controls, 'distance5D', 1, 5).name('5D Distance');
+gui.add(controls, 'resolution', 5, 20).step(1).name('Resolution').onChange(generateHypersphere);
+gui.add(controls, 'sphereRadius', 0.5, 2).name('Radius').onChange(generateHypersphere);
+
+rotationFolder4D.open();
+rotationFolder5D.open();
+
+// Position camera
+camera.position.z = 5;
+
+// Create points for 5D hypersphere
+function generateHyperspherePoints() {
+    const points5D = [];
+    const resolution = Math.floor(controls.resolution);
+    const radius = controls.sphereRadius;
+    
+    // Generate points using 5D spherical coordinates
+    for(let i = 0; i < resolution; i++) {
+        const phi1 = Math.PI * i / (resolution - 1);
+        for(let j = 0; j < resolution; j++) {
+            const phi2 = Math.PI * j / (resolution - 1);
+            for(let k = 0; k < resolution; k++) {
+                const phi3 = Math.PI * k / (resolution - 1);
+                for(let l = 0; l < resolution; l++) {
+                    const phi4 = 2 * Math.PI * l / (resolution - 1);
+                    
+                    // Convert 5D spherical to Cartesian coordinates
+                    const x = radius * Math.sin(phi1) * Math.sin(phi2) * Math.sin(phi3) * Math.cos(phi4);
+                    const y = radius * Math.sin(phi1) * Math.sin(phi2) * Math.sin(phi3) * Math.sin(phi4);
+                    const z = radius * Math.sin(phi1) * Math.sin(phi2) * Math.cos(phi3);
+                    const w = radius * Math.sin(phi1) * Math.cos(phi2);
+                    const v = radius * Math.cos(phi1);
+                    
+                    points5D.push([x, y, z, w, v]);
+                }
+            }
+        }
+    }
+    
+    return points5D;
+}
+
+// Rotation matrices for 5D
+function rotate5D(point, angles) {
+    let [x, y, z, w, v] = point;
+    let temp;
+    
+    // 4D rotations
+    // XY rotation
+    temp = x;
+    x = x * Math.cos(angles.xy) - y * Math.sin(angles.xy);
+    y = temp * Math.sin(angles.xy) + y * Math.cos(angles.xy);
+    
+    // YZ rotation
+    temp = y;
+    y = y * Math.cos(angles.yz) - z * Math.sin(angles.yz);
+    z = temp * Math.sin(angles.yz) + z * Math.cos(angles.yz);
+    
+    // XZ rotation
+    temp = x;
+    x = x * Math.cos(angles.xz) - z * Math.sin(angles.xz);
+    z = temp * Math.sin(angles.xz) + z * Math.cos(angles.xz);
+    
+    // XW rotation
+    temp = x;
+    x = x * Math.cos(angles.xw) - w * Math.sin(angles.xw);
+    w = temp * Math.sin(angles.xw) + w * Math.cos(angles.xw);
+    
+    // YW rotation
+    temp = y;
+    y = y * Math.cos(angles.yw) - w * Math.sin(angles.yw);
+    w = temp * Math.sin(angles.yw) + w * Math.cos(angles.yw);
+    
+    // ZW rotation
+    temp = z;
+    z = z * Math.cos(angles.zw) - w * Math.sin(angles.zw);
+    w = temp * Math.sin(angles.zw) + w * Math.cos(angles.zw);
+    
+    // 5D rotations
+    // XV rotation
+    temp = x;
+    x = x * Math.cos(angles.xv) - v * Math.sin(angles.xv);
+    v = temp * Math.sin(angles.xv) + v * Math.cos(angles.xv);
+    
+    // YV rotation
+    temp = y;
+    y = y * Math.cos(angles.yv) - v * Math.sin(angles.yv);
+    v = temp * Math.sin(angles.yv) + v * Math.cos(angles.yv);
+    
+    // ZV rotation
+    temp = z;
+    z = z * Math.cos(angles.zv) - v * Math.sin(angles.zv);
+    v = temp * Math.sin(angles.zv) + v * Math.cos(angles.zv);
+    
+    // WV rotation
+    temp = w;
+    w = w * Math.cos(angles.wv) - v * Math.sin(angles.wv);
+    v = temp * Math.sin(angles.wv) + v * Math.cos(angles.wv);
+    
+    return [x, y, z, w, v];
+}
+
+// Project 5D to 3D (through 4D)
+function project5Dto3D(point5D) {
+    const v = point5D[4];
+    const w = point5D[3];
+    const distance = controls.distance5D;
+    
+    // First project from 5D to 4D
+    const projectionFactor5D = distance / (distance - v);
+    const x4D = point5D[0] * projectionFactor5D;
+    const y4D = point5D[1] * projectionFactor5D;
+    const z4D = point5D[2] * projectionFactor5D;
+    const w4D = point5D[3] * projectionFactor5D;
+    
+    // Then project from 4D to 3D
+    const projectionFactor4D = distance / (distance - w4D);
+    
+    return [
+        x4D * projectionFactor4D,
+        y4D * projectionFactor4D,
+        z4D * projectionFactor4D
+    ];
+}
+
+let pointCloud;
+let points5D;
+
+function generateHypersphere() {
+    if (pointCloud) {
+        scene.remove(pointCloud);
+    }
+
+    points5D = generateHyperspherePoints();
+    
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(points5D.length * 3);
+    
+    points5D.forEach((point, i) => {
+        const projected = project5Dto3D(point);
+        positions[i * 3] = projected[0];
+        positions[i * 3 + 1] = projected[1];
+        positions[i * 3 + 2] = projected[2];
+    });
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    const material = new THREE.PointsMaterial({
+        size: 0.03,
+        color: 0xff00ff,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+    });
+    
+    pointCloud = new THREE.Points(geometry, material);
+    scene.add(pointCloud);
+}
+
+// Animation variables
+let angles = {
+    xy: 0, yz: 0, xz: 0,
+    xw: 0, yw: 0, zw: 0,
+    xv: 0, yv: 0, zv: 0, wv: 0
+};
+
+function updateHypersphere() {
+    if (!pointCloud) return;
+    
+    const positions = pointCloud.geometry.attributes.position.array;
+    
+    points5D.forEach((point, i) => {
+        const rotated = rotate5D(point, angles);
+        const projected = project5Dto3D(rotated);
+        
+        positions[i * 3] = projected[0];
+        positions[i * 3 + 1] = projected[1];
+        positions[i * 3 + 2] = projected[2];
+    });
+    
+    pointCloud.geometry.attributes.position.needsUpdate = true;
+}
+
+// Animation
+function animate() {
+    requestAnimationFrame(animate);
+    
+    // Update all rotation angles
+    angles.xy += controls.rotationXY;
+    angles.yz += controls.rotationYZ;
+    angles.xz += controls.rotationXZ;
+    angles.xw += controls.rotationXW;
+    angles.yw += controls.rotationYW;
+    angles.zw += controls.rotationZW;
+    angles.xv += controls.rotationXV;
+    angles.yv += controls.rotationYV;
+    angles.zv += controls.rotationZV;
+    angles.wv += controls.rotationWV;
+    
+    updateHypersphere();
+    renderer.render(scene, camera);
+}
+
+// Handle window resize
+window.addEventListener('resize', onWindowResize, false);
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Initial generation
+generateHypersphere();
+animate();
+</script>
+</body></html>
